@@ -277,18 +277,20 @@
     }
 
     function startEmulator() {
-        console.log("[EMU] starting magdrop3");
+        console.log("[EMU] starting " + ROMNAME);
         cancelMainLoop();
 
-        // Write neogeo BIOS to FS — MAME requires it alongside the game ROM
-        if (BIOSDATA) {
-            try {
-                FS.createDataFile("/", "neogeo.zip", new Uint8Array(BIOSDATA), true, false);
-                console.log("[EMU] neogeo.zip BIOS written to FS");
-            } catch(e) {
-                console.warn("[EMU] BIOS write: " + e);
-            }
-        }
+        // emu_core3.js preRun may have fired before ROMDATA was ready (race condition).
+        // Always write both files explicitly here so MAME is guaranteed to find them.
+        try {
+            FS.writeFile("/" + ROMNAME, new Uint8Array(ROMDATA));
+            console.log("[EMU] game ROM written: " + ROMNAME);
+        } catch(e) { console.warn("[EMU] ROM write: " + e); }
+
+        try {
+            FS.writeFile("/neogeo.zip", new Uint8Array(BIOSDATA));
+            console.log("[EMU] neogeo BIOS written");
+        } catch(e) { console.warn("[EMU] BIOS write: " + e); }
 
         Emulator_started = false;
         Emulator_running = true;
