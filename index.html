@@ -140,8 +140,8 @@
 
         /* Neo Geo 4-button layout: A B C D */
         #buttons-area {
-            position: absolute; right: 16px; bottom: 20px;
-            display: flex; gap: 12px; align-items: center;
+            position: absolute; right: 12px; bottom: 16px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
             pointer-events: auto;
         }
         .action-btn {
@@ -197,6 +197,18 @@
 </head>
 <body>
 <!-- Must be first: injects COOP/COEP headers via service worker so Chrome/Firefox allow SharedArrayBuffer for WASM -->
+<script>
+    // Firefox fix: service worker activates AFTER the page loads via clients.claim().
+    // coi-serviceworker doesn't always catch this timing → add controllerchange listener
+    // so the page reloads automatically when the SW becomes the controller.
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!window.crossOriginIsolated) {
+                window.location.reload();
+            }
+        });
+    }
+</script>
 <script src="coi-serviceworker.min.js"></script>
 
 <div id="loading">
@@ -226,6 +238,7 @@
             <div class="action-btn" id="btn-a" data-key="KeyA">A</div>
             <div class="action-btn" id="btn-b" data-key="KeyS">B</div>
             <div class="action-btn" id="btn-c" data-key="KeyD">C</div>
+            <div class="action-btn" id="btn-d" data-key="KeyW">D</div>
         </div>
         <div class="screw" id="screw-tl"></div>
         <div class="screw" id="screw-tr"></div>
