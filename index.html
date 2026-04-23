@@ -196,6 +196,8 @@
     </style>
 </head>
 <body>
+<!-- Must be first: injects COOP/COEP headers via service worker so Chrome/Firefox allow SharedArrayBuffer for WASM -->
+<script src="coi-serviceworker.min.js"></script>
 
 <div id="loading">
     <div class="title">MAGICAL DROP 3</div>
@@ -214,7 +216,7 @@
     <div id="control-panel">
         <div id="player-label">PLAYER 1</div>
         <div id="coin-start-row">
-            <div class="coin-start-btn" id="btn-coin" data-key="Digit1">COIN</div>
+            <div class="coin-start-btn" id="btn-coin" data-key="Numpad1">COIN</div>
             <div class="coin-start-btn" id="btn-start" data-key="Enter">START</div>
         </div>
         <div id="joystick-zone">
@@ -371,9 +373,10 @@
         "KeyS":       { key: "s",          keyCode: 83 },
         "KeyD":       { key: "d",          keyCode: 68 },
         "KeyW":       { key: "w",          keyCode: 87 },
-        "Digit1":     { key: "1",          keyCode: 49 },
-        "Digit5":     { key: "5",          keyCode: 53 },
-        "Enter":      { key: "Enter",      keyCode: 13 }
+        "Numpad1":    { key: "1",          keyCode: 97  },
+        "Digit1":     { key: "1",          keyCode: 49  },
+        "Digit5":     { key: "5",          keyCode: 53  },
+        "Enter":      { key: "Enter",      keyCode: 13  }
     };
     function sendKey(type, code) {
         var m = keyMap[code] || { key: code, keyCode: 0 };
