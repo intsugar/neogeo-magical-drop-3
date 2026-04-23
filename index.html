@@ -210,13 +210,13 @@
     <div id="marquee">NEO GEO MVS <span>///</span> <span class="game-title">MAGICAL DROP 3</span></div>
     <div id="screen-bezel">
         <div id="container">
-            <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+            <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
         </div>
     </div>
     <div id="control-panel">
         <div id="player-label">PLAYER 1</div>
         <div id="coin-start-row">
-            <div class="coin-start-btn" id="btn-coin" data-key="Numpad1">COIN</div>
+            <div class="coin-start-btn" id="btn-coin" data-key="Digit1">COIN</div>
             <div class="coin-start-btn" id="btn-start" data-key="Enter">START</div>
         </div>
         <div id="joystick-zone">
@@ -236,35 +236,68 @@
 </div>
 
 <script>
-    // ── Globals read by emu_core3.js (parent.ROMDATA / parent.ROMNAME) ──
-    var ROMDATA  = null;   // game ROM  → written by emu_core3 preRun
+    // ── Globals read by emu_core3.js preRun (parent.* = window.* in single-page mode) ──
+    var ROMDATA  = null;
     var ROMNAME  = "magdrop3.zip";
-    var BIOSDATA = null;   // neogeo BIOS → written manually before callMain
+    var BIOSDATA = null;
+    var BIOSNAME = "neogeo.zip";
     var RETROCFG = "";
     var statusEl = document.getElementById("load-status");
+    var emuStarted   = false;
+    var emuAttempted = false;
 
     // ── Emulator callbacks ──
-    function checkControls()         {}
+    function checkControls()         { onEmulatorReady(); }
     function isMobileDevice()        { return false; }
     function getSoundStatus()        { return true; }
     function enableControls()        {}
     function mobileControlsVisible() { return false; }
     function goBackButtonResetIncrement() {}
-
-    var emuStarted = false;
     function onEmulatorReady() {}
+
     function onEmulatorStarted() {
         if (emuStarted) return;
         emuStarted = true;
         document.getElementById("loading").style.display = "none";
     }
-    setTimeout(function() { if (!emuStarted) onEmulatorStarted(); }, 14000);
-    setInterval(function() {
-        try {
-            if (typeof Emulator_running !== "undefined") Emulator_running = true;
-            if (typeof Emulator_started !== "undefined" && Emulator_started === true) onEmulatorStarted();
-        } catch(e) {}
-    }, 500);
+
+    // ── Build RetroArch config (same as Metal Slug X — ensures coin key mapping works) ──
+    function buildConfig() {
+        var w = window.innerWidth, h = window.innerHeight, e = "scroll_lock", c = "";
+        c += "rgui_browser_directory = /\n";
+        c += "input_player1_start = enter\ninput_player1_select = num1\n";
+        c += "input_player1_a = a\ninput_player1_b = s\ninput_player1_r = d\n";
+        c += "input_player1_x = w\ninput_player1_y = q\ninput_player1_l = e\n";
+        c += "input_audio_mute = f9\ninput_reset = f10\n";
+        ["input_toggle_fast_forward","input_hold_fast_forward","input_toggle_slowmotion","input_hold_slowmotion",
+         "input_save_state","input_load_state","input_toggle_fullscreen","input_exit_emulator",
+         "input_state_slot_increase","input_state_slot_decrease","input_rewind","input_movie_record_toggle",
+         "input_pause_toggle","input_frame_advance","input_shader_next","input_shader_prev",
+         "input_cheat_index_plus","input_cheat_index_minus","input_cheat_toggle","input_screenshot",
+         "input_osk_toggle","input_netplay_game_watch","input_volume_up","input_volume_down",
+         "input_overlay_next","input_disk_eject_toggle","input_disk_next","input_disk_prev",
+         "input_grab_mouse_toggle","input_game_focus_toggle","input_menu_toggle",
+         "input_recording_toggle","input_streaming_toggle"
+        ].forEach(function(k){ c += k + " = " + e + "\n"; });
+        ["l2","r2","l3","r3","l_x_plus","l_x_minus","l_y_plus","l_y_minus",
+         "r_x_plus","r_x_minus","r_y_plus","r_y_minus",
+         "gun_trigger","gun_trigger_axis","gun_trigger_btn","gun_trigger_mbtn",
+         "gun_offscreen_shot","gun_aux_a","gun_aux_b","gun_aux_c",
+         "gun_start","gun_select","gun_dpad_up","gun_dpad_down","gun_dpad_left","gun_dpad_right","turbo"
+        ].forEach(function(k){ c += "input_player1_" + k + " = " + e + "\n"; });
+        var all = ["up","down","left","right","start","select","a","b","x","y","l","l2","l3","r","r2","r3",
+            "l_x_plus","l_x_minus","l_y_plus","l_y_minus","r_x_plus","r_x_minus","r_y_plus","r_y_minus",
+            "gun_trigger","gun_trigger_axis","gun_trigger_btn","gun_trigger_mbtn",
+            "gun_offscreen_shot","gun_aux_a","gun_aux_b","gun_aux_c",
+            "gun_start","gun_select","gun_dpad_up","gun_dpad_down","gun_dpad_left","gun_dpad_right","turbo"];
+        for (var p = 2; p <= 5; p++) { all.forEach(function(k){ c += "input_player" + p + "_" + k + " = " + e + "\n"; }); }
+        c += "video_vsync = true\nvideo_scale = 1\n";
+        c += "video_window_x = " + w + "\nvideo_window_y = " + h + "\n";
+        c += "aspect_ratio_index = 23\ncustom_viewport_width = " + w + "\ncustom_viewport_height = " + h + "\n";
+        c += "custom_viewport_x = 0\ncustom_viewport_y = 0\naudio_latency = 128\n";
+        c += "video_message_pos_x = -100\nvideo_message_pos_y = -100\nmenu_enable_widgets = false\n";
+        return c;
+    }
 
     // ── MAME helpers ──
     function cancelMainLoop() {
@@ -272,30 +305,38 @@
     }
     function resizeCanvas() {
         try {
-            var c = document.getElementById("container");
-            Module.setCanvasSize(c.offsetWidth || window.innerWidth, c.offsetHeight || window.innerHeight, true);
+            var bezel = document.getElementById("screen-bezel");
+            var cw = bezel.offsetWidth || window.innerWidth;
+            var ch = bezel.offsetHeight || (window.innerHeight * 0.6);
+            Module.setCanvasSize(cw, ch, true);
         } catch(e) {}
     }
 
     function startEmulator() {
-        console.log("[EMU] starting " + ROMNAME);
+        if (emuStarted) return;
+        emuAttempted = true;
+        console.warn("[EMU] startEmulator: callMain with /" + ROMNAME);
+        statusEl.textContent = "Starting game...";
+
+        var bezel = document.getElementById("screen-bezel");
+        var cw = bezel.offsetWidth || window.innerWidth;
+        var ch = bezel.offsetHeight || (window.innerHeight * 0.6);
+
         cancelMainLoop();
 
-        // emu_core3.js preRun may have fired before ROMDATA was ready (race condition).
-        // Always write both files explicitly here so MAME is guaranteed to find them.
-        try {
-            FS.writeFile("/" + ROMNAME, new Uint8Array(ROMDATA));
-            console.log("[EMU] game ROM written: " + ROMNAME);
-        } catch(e) { console.warn("[EMU] ROM write: " + e); }
-
-        try {
-            FS.writeFile("/neogeo.zip", new Uint8Array(BIOSDATA));
-            console.log("[EMU] neogeo BIOS written");
-        } catch(e) { console.warn("[EMU] BIOS write: " + e); }
+        // Belt-and-suspenders: write files directly in case preRun raced
+        try { FS.writeFile("/" + ROMNAME,   new Uint8Array(ROMDATA));  } catch(e) {}
+        try { FS.writeFile("/" + BIOSNAME,  new Uint8Array(BIOSDATA)); } catch(e) {}
 
         Emulator_started = false;
         Emulator_running = true;
-        Module.callMain(["/" + ROMNAME]);
+
+        try {
+            Module.callMain(["/" + ROMNAME]);
+        } catch(e) { console.warn("[EMU] callMain error: " + e); }
+
+        document.getElementById("canvas").width  = cw;
+        document.getElementById("canvas").height = ch;
         setTimeout(resizeCanvas, 500);
         setTimeout(resizeCanvas, 1500);
         setTimeout(resizeCanvas, 3000);
@@ -303,65 +344,95 @@
 
     window.addEventListener("resize", resizeCanvas);
 
-    // ── Load ROM + BIOS in parallel, start when both ready ──
-    var romReady  = false;
-    var biosReady = false;
-    var moduleReady = false;
+    setInterval(function() {
+        try {
+            if (typeof Emulator_running !== "undefined") Emulator_running = true;
+            if (typeof Emulator_started !== "undefined" && Emulator_started === true) onEmulatorStarted();
+        } catch(e) {}
+    }, 500);
 
-    function maybeStart() {
-        if (romReady && biosReady && moduleReady) {
-            setTimeout(startEmulator, 500);
-        }
-    }
+    // ── Load BIOS first, then ROM, then emu_core3.js (matching Metal Slug X working pattern) ──
+    statusEl.textContent = "Loading BIOS...";
+    var xhrBios = new XMLHttpRequest();
+    xhrBios.open("GET", "roms/" + BIOSNAME, true);
+    xhrBios.responseType = "arraybuffer";
+    xhrBios.onload = function() {
+        if (xhrBios.status !== 200) { statusEl.textContent = "Failed to load BIOS"; return; }
+        BIOSDATA = xhrBios.response;
+        statusEl.textContent = "Loading ROM...";
 
-    function loadFile(name, label, onDone) {
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", "roms/" + name, true);
+        xhr.open("GET", "roms/" + ROMNAME, true);
         xhr.responseType = "arraybuffer";
         xhr.onprogress = function(e) {
             if (e.lengthComputable)
-                statusEl.textContent = "Loading " + label + "... " + Math.round((e.loaded / e.total) * 100) + "%";
+                statusEl.textContent = "Loading ROM... " + Math.round((e.loaded / e.total) * 100) + "%";
         };
         xhr.onload = function() {
-            if (xhr.status === 200) onDone(xhr.response);
-            else statusEl.textContent = "Failed to load " + label;
+            if (xhr.status !== 200) { statusEl.textContent = "Failed to load ROM"; return; }
+            ROMDATA = xhr.response;
+            RETROCFG = buildConfig();
+            statusEl.textContent = "Loading emulator core...";
+
+            document.getElementById("cabinet").style.display = "flex";
+
+            // Load emu_core3.js AFTER data is ready so preRun finds ROMDATA/BIOSDATA/RETROCFG
+            var script = document.createElement("script");
+            script.src = "emu_core3.js?v=" + Date.now();
+            script.onload = function() {
+                statusEl.textContent = "Compiling WASM...";
+                var startTime = Date.now();
+                var checker = setInterval(function() {
+                    var elapsed = Math.round((Date.now() - startTime) / 1000);
+                    try {
+                        if (Module && Module.calledRun === true) {
+                            clearInterval(checker);
+                            statusEl.textContent = "WASM ready, starting game...";
+                            setTimeout(startEmulator, 2000);
+                            return;
+                        }
+                    } catch(e) {}
+                    if (elapsed % 5 === 0 && elapsed > 0)
+                        statusEl.textContent = "Compiling WASM... " + elapsed + "s";
+                    if (elapsed > 30 && !emuAttempted) {
+                        clearInterval(checker);
+                        statusEl.textContent = "WASM timeout, starting...";
+                        try { if (Module && typeof Module.callMain === "function") startEmulator(); } catch(e) {}
+                    }
+                }, 500);
+            };
+            script.onerror = function() { statusEl.textContent = "Failed to load emulator core"; };
+            document.body.appendChild(script);
         };
-        xhr.onerror = function() { statusEl.textContent = "Network error: " + label; };
+        xhr.onerror = function() { statusEl.textContent = "Network error loading ROM"; };
         xhr.send();
-    }
+    };
+    xhrBios.onerror = function() { statusEl.textContent = "Network error loading BIOS"; };
+    xhrBios.send();
 
-    loadFile("magdrop3.zip", "Magical Drop 3", function(data) {
-        ROMDATA = data;
-        romReady = true;
-        statusEl.textContent = "Loading BIOS...";
-        maybeStart();
-    });
-
-    loadFile("neogeo.zip", "Neo Geo BIOS", function(data) {
-        BIOSDATA = data;
-        biosReady = true;
-        document.getElementById("cabinet").style.display = "flex";
-        maybeStart();
-    });
-
-    var moduleChecker = setInterval(function() {
-        try {
-            if (Module && Module.calledRun === true) {
-                clearInterval(moduleChecker);
-                moduleReady = true;
-                maybeStart();
-            }
-        } catch(e) {}
-    }, 300);
-
+    // Error recovery
+    var errorRetryCount = 0;
     window.onerror = function(msg) {
         console.warn("[EMU] onerror: " + msg);
+        errorRetryCount++;
+        if (errorRetryCount > 3) return true;
         setTimeout(function() {
-            try { cancelMainLoop(); Emulator_started = false; Emulator_running = true; Module.callMain(["/" + ROMNAME]); resizeCanvas(); }
-            catch(e) { console.warn("[EMU] retry: " + e); }
-        }, 5000);
+            try { cancelMainLoop(); Emulator_started = false; Emulator_running = true; Module.callMain(["/" + ROMNAME]); }
+            catch(e) { console.warn("[EMU] retry error: " + e); }
+        }, 3000);
         return true;
     };
+
+    // 30s fallback
+    setTimeout(function() {
+        if (!emuStarted) {
+            document.getElementById("loading").style.display = "none";
+            try {
+                if (typeof Emulator_running !== "undefined") Emulator_running = true;
+                if (!emuAttempted && typeof startEmulator === "function") startEmulator();
+            } catch(e) {}
+        }
+    }, 30000);
 
     // ── Key dispatch ──
     var keyMap = {
@@ -373,10 +444,8 @@
         "KeyS":       { key: "s",          keyCode: 83 },
         "KeyD":       { key: "d",          keyCode: 68 },
         "KeyW":       { key: "w",          keyCode: 87 },
-        "Numpad1":    { key: "1",          keyCode: 97  },
-        "Digit1":     { key: "1",          keyCode: 49  },
-        "Digit5":     { key: "5",          keyCode: 53  },
-        "Enter":      { key: "Enter",      keyCode: 13  }
+        "Digit1":     { key: "1",          keyCode: 49 },
+        "Enter":      { key: "Enter",      keyCode: 13 }
     };
     function sendKey(type, code) {
         var m = keyMap[code] || { key: code, keyCode: 0 };
@@ -446,9 +515,6 @@
 
     document.addEventListener("dblclick", function(e){ e.preventDefault(); });
 </script>
-
-<!-- Standalone MAME WASM — no RetroArch, no iframe -->
-<script src="emu_core3.js"></script>
 
 </body>
 </html>
