@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Magical Drop 3 — Neo Geo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: #0a0a12; width: 100%; height: 100%; overflow: hidden; }
+
+        /* === LOADING === */
+        #loading {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #0a0a12; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #loading .title {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 28px; font-weight: bold; color: #ff4444;
+            text-shadow: 0 0 20px rgba(255,60,60,0.5); margin-bottom: 10px;
+        }
+        #loading .subtitle {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 14px; color: #aaa; margin-bottom: 30px;
+        }
+        #loading .status {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px; color: #888;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 4px solid rgba(255,60,60,0.2);
+            border-top: 4px solid #ff4444; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* === CABINET === */
+        #cabinet {
+            display: none; width: 100%; height: 100%;
+            flex-direction: column; position: relative;
+        }
+
+        /* Neo Geo red/black marquee */
+        #marquee {
+            height: 32px; flex-shrink: 0;
+            background: linear-gradient(180deg, #2a0a0a 0%, #1a0505 100%);
+            border-bottom: 2px solid #5a1010;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11px; font-weight: bold; color: #cc4444;
+            letter-spacing: 3px; text-transform: uppercase;
+        }
+        #marquee span { color: #ff2222; margin: 0 4px; text-shadow: 0 0 8px rgba(255,40,40,0.5); }
+        #marquee .game-title { color: #ff8844; letter-spacing: 2px; text-shadow: 0 0 8px rgba(255,120,60,0.4); }
+
+        #screen-bezel {
+            flex: 1; position: relative; overflow: hidden; background: #000;
+            border-left: 6px solid #1a0a0a; border-right: 6px solid #1a0a0a;
+        }
+        #screen-bezel::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+            pointer-events: none; z-index: 2;
+        }
+
+        #container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+        #container canvas { width: 100% !important; height: 100% !important; display: block; }
+
+        /* === CONTROL PANEL — Neo Geo red/dark theme === */
+        #control-panel {
+            height: 35%; min-height: 180px; flex-shrink: 0; position: relative;
+            background: linear-gradient(180deg, #1e0e0e 0%, #130808 40%, #0e0505 100%);
+            border-top: 3px solid #4a1010;
+        }
+        #control-panel::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse at 30% 30%, rgba(120,30,30,0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 60%, rgba(100,20,20,0.06) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        #control-panel::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #441111, #aa2222, #441111); opacity: 0.6;
+        }
+
+        #player-label {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10px; font-weight: bold; color: #6a2222;
+            letter-spacing: 4px; text-transform: uppercase;
+        }
+
+        #coin-start-row {
+            position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px;
+        }
+        .coin-start-btn {
+            padding: 5px 14px; border-radius: 4px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10px; font-weight: bold; letter-spacing: 1px;
+            pointer-events: auto; touch-action: none; text-transform: uppercase; cursor: pointer;
+        }
+        .coin-start-btn:active, .coin-start-btn.active { transform: scale(0.95); }
+        #btn-coin {
+            background: linear-gradient(180deg, #3a2010, #2a1508);
+            border: 1px solid #664420; color: #ddaa22;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        #btn-start {
+            background: linear-gradient(180deg, #3a1010, #2a0808);
+            border: 1px solid #882020; color: #ff4444;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* Joystick */
+        #joystick-zone {
+            position: absolute; left: 20px; bottom: 16px;
+            width: 150px; height: 150px; pointer-events: auto; touch-action: none;
+        }
+        #joystick-base {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 120px; height: 120px; border-radius: 50%;
+            background: radial-gradient(circle, #1a0a0a 0%, #0e0505 70%, #080305 100%);
+            border: 3px solid #3a1010;
+            box-shadow: inset 0 3px 10px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+        }
+        #joystick-base::after {
+            content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 90px; height: 90px; border-radius: 50%;
+            border: 1px dashed rgba(255,60,60,0.1);
+        }
+        #joystick-ball {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 54px; height: 54px; border-radius: 50%;
+            background: radial-gradient(circle at 38% 35%, #553333, #331111, #220808);
+            border: 2px solid #552222;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.7), inset 0 -3px 6px rgba(0,0,0,0.5), inset 0 3px 6px rgba(255,80,80,0.08);
+            transition: transform 0.05s ease-out; cursor: grab;
+        }
+
+        /* Neo Geo 4-button layout: A B C D */
+        #buttons-area {
+            position: absolute; right: 16px; bottom: 20px;
+            display: flex; gap: 12px; align-items: center;
+            pointer-events: auto;
+        }
+        .action-btn {
+            width: 58px; height: 58px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; font-weight: bold; color: #fff;
+            pointer-events: auto; touch-action: none; cursor: pointer; transition: all 0.08s;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .action-btn:active, .action-btn.active { transform: scale(0.90); filter: brightness(1.4); }
+
+        /* Neo Geo button colors: A=red, B=yellow, C=green, D=blue */
+        #btn-a {
+            background: radial-gradient(circle at 40% 35%, #cc2222, #881111, #660d0d);
+            border: 3px solid #dd3333;
+            box-shadow: 0 4px 12px rgba(180,20,20,0.5), inset 0 2px 4px rgba(255,255,255,0.12);
+        }
+        #btn-b {
+            background: radial-gradient(circle at 40% 35%, #ccaa00, #886600, #664d00);
+            border: 3px solid #ddbb11;
+            box-shadow: 0 4px 12px rgba(180,150,0,0.5), inset 0 2px 4px rgba(255,255,255,0.12);
+        }
+        #btn-c {
+            background: radial-gradient(circle at 40% 35%, #22aa22, #116611, #0d500d);
+            border: 3px solid #33bb33;
+            box-shadow: 0 4px 12px rgba(20,160,20,0.5), inset 0 2px 4px rgba(255,255,255,0.12);
+        }
+        #btn-d {
+            background: radial-gradient(circle at 40% 35%, #2233cc, #112288, #0d1966);
+            border: 3px solid #3344dd;
+            box-shadow: 0 4px 12px rgba(20,40,200,0.5), inset 0 2px 4px rgba(255,255,255,0.12);
+        }
+
+        .screw {
+            position: absolute; width: 10px; height: 10px; border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, #442222, #221111, #110808);
+            border: 1px solid #333;
+        }
+        .screw::after {
+            content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 8px; color: rgba(255,100,100,0.2); line-height: 1;
+        }
+        #screw-tl { top: 6px; left: 6px; }
+        #screw-tr { top: 6px; right: 6px; }
+        #screw-bl { bottom: 6px; left: 6px; }
+        #screw-br { bottom: 6px; right: 6px; }
+
+        #cab-bottom {
+            height: 6px; flex-shrink: 0;
+            background: linear-gradient(180deg, #0e0505, #050203); border-top: 1px solid #2a0808;
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div class="title">MAGICAL DROP 3</div>
+    <div class="subtitle">SNK Neo Geo MVS — Arcade</div>
+    <div class="spinner"></div>
+    <div class="status" id="load-status">Loading...</div>
+</div>
+
+<div id="cabinet">
+    <div id="marquee">NEO GEO MVS <span>///</span> <span class="game-title">MAGICAL DROP 3</span></div>
+    <div id="screen-bezel">
+        <div id="container">
+            <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+        </div>
+    </div>
+    <div id="control-panel">
+        <div id="player-label">PLAYER 1</div>
+        <div id="coin-start-row">
+            <div class="coin-start-btn" id="btn-coin" data-key="Digit5">COIN</div>
+            <div class="coin-start-btn" id="btn-start" data-key="Digit1">START</div>
+        </div>
+        <div id="joystick-zone">
+            <div id="joystick-base"><div id="joystick-ball"></div></div>
+        </div>
+        <div id="buttons-area">
+            <div class="action-btn" id="btn-a" data-key="KeyA">A</div>
+            <div class="action-btn" id="btn-b" data-key="KeyS">B</div>
+            <div class="action-btn" id="btn-c" data-key="KeyD">C</div>
+            <div class="action-btn" id="btn-d" data-key="KeyW">D</div>
+        </div>
+        <div class="screw" id="screw-tl"></div>
+        <div class="screw" id="screw-tr"></div>
+        <div class="screw" id="screw-bl"></div>
+        <div class="screw" id="screw-br"></div>
+    </div>
+    <div id="cab-bottom"></div>
+</div>
+
+<script>
+    // ── Globals read by emu_core3.js (parent.ROMDATA / parent.ROMNAME) ──
+    var ROMDATA  = null;   // game ROM  → written by emu_core3 preRun
+    var ROMNAME  = "magdrop3.zip";
+    var BIOSDATA = null;   // neogeo BIOS → written manually before callMain
+    var RETROCFG = "";
+    var statusEl = document.getElementById("load-status");
+
+    // ── Emulator callbacks ──
+    function checkControls()         {}
+    function isMobileDevice()        { return false; }
+    function getSoundStatus()        { return true; }
+    function enableControls()        {}
+    function mobileControlsVisible() { return false; }
+    function goBackButtonResetIncrement() {}
+
+    var emuStarted = false;
+    function onEmulatorReady() {}
+    function onEmulatorStarted() {
+        if (emuStarted) return;
+        emuStarted = true;
+        document.getElementById("loading").style.display = "none";
+    }
+    setTimeout(function() { if (!emuStarted) onEmulatorStarted(); }, 14000);
+    setInterval(function() {
+        try {
+            if (typeof Emulator_running !== "undefined") Emulator_running = true;
+            if (typeof Emulator_started !== "undefined" && Emulator_started === true) onEmulatorStarted();
+        } catch(e) {}
+    }, 500);
+
+    // ── MAME helpers ──
+    function cancelMainLoop() {
+        try { Browser.mainLoop.currentlyRunningMainloop++; Browser.mainLoop.func = null; } catch(e) {}
+    }
+    function resizeCanvas() {
+        try {
+            var c = document.getElementById("container");
+            Module.setCanvasSize(c.offsetWidth || window.innerWidth, c.offsetHeight || window.innerHeight, true);
+        } catch(e) {}
+    }
+
+    function startEmulator() {
+        console.log("[EMU] starting magdrop3");
+        cancelMainLoop();
+
+        // Write neogeo BIOS to FS — MAME requires it alongside the game ROM
+        if (BIOSDATA) {
+            try {
+                FS.createDataFile("/", "neogeo.zip", new Uint8Array(BIOSDATA), true, false);
+                console.log("[EMU] neogeo.zip BIOS written to FS");
+            } catch(e) {
+                console.warn("[EMU] BIOS write: " + e);
+            }
+        }
+
+        Emulator_started = false;
+        Emulator_running = true;
+        Module.callMain(["/" + ROMNAME]);
+        setTimeout(resizeCanvas, 500);
+        setTimeout(resizeCanvas, 1500);
+        setTimeout(resizeCanvas, 3000);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // ── Load ROM + BIOS in parallel, start when both ready ──
+    var romReady  = false;
+    var biosReady = false;
+    var moduleReady = false;
+
+    function maybeStart() {
+        if (romReady && biosReady && moduleReady) {
+            setTimeout(startEmulator, 500);
+        }
+    }
+
+    function loadFile(name, label, onDone) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "roms/" + name, true);
+        xhr.responseType = "arraybuffer";
+        xhr.onprogress = function(e) {
+            if (e.lengthComputable)
+                statusEl.textContent = "Loading " + label + "... " + Math.round((e.loaded / e.total) * 100) + "%";
+        };
+        xhr.onload = function() {
+            if (xhr.status === 200) onDone(xhr.response);
+            else statusEl.textContent = "Failed to load " + label;
+        };
+        xhr.onerror = function() { statusEl.textContent = "Network error: " + label; };
+        xhr.send();
+    }
+
+    loadFile("magdrop3.zip", "Magical Drop 3", function(data) {
+        ROMDATA = data;
+        romReady = true;
+        statusEl.textContent = "Loading BIOS...";
+        maybeStart();
+    });
+
+    loadFile("neogeo.zip", "Neo Geo BIOS", function(data) {
+        BIOSDATA = data;
+        biosReady = true;
+        document.getElementById("cabinet").style.display = "flex";
+        maybeStart();
+    });
+
+    var moduleChecker = setInterval(function() {
+        try {
+            if (Module && Module.calledRun === true) {
+                clearInterval(moduleChecker);
+                moduleReady = true;
+                maybeStart();
+            }
+        } catch(e) {}
+    }, 300);
+
+    window.onerror = function(msg) {
+        console.warn("[EMU] onerror: " + msg);
+        setTimeout(function() {
+            try { cancelMainLoop(); Emulator_started = false; Emulator_running = true; Module.callMain(["/" + ROMNAME]); resizeCanvas(); }
+            catch(e) { console.warn("[EMU] retry: " + e); }
+        }, 5000);
+        return true;
+    };
+
+    // ── Key dispatch ──
+    var keyMap = {
+        "ArrowUp":    { key: "ArrowUp",    keyCode: 38 },
+        "ArrowDown":  { key: "ArrowDown",  keyCode: 40 },
+        "ArrowLeft":  { key: "ArrowLeft",  keyCode: 37 },
+        "ArrowRight": { key: "ArrowRight", keyCode: 39 },
+        "KeyA":       { key: "a",          keyCode: 65 },
+        "KeyS":       { key: "s",          keyCode: 83 },
+        "KeyD":       { key: "d",          keyCode: 68 },
+        "KeyW":       { key: "w",          keyCode: 87 },
+        "Digit1":     { key: "1",          keyCode: 49 },
+        "Digit5":     { key: "5",          keyCode: 53 }
+    };
+    function sendKey(type, code) {
+        var m = keyMap[code] || { key: code, keyCode: 0 };
+        document.dispatchEvent(new KeyboardEvent(type, {
+            code: code, key: m.key, keyCode: m.keyCode, which: m.keyCode,
+            bubbles: true, cancelable: true
+        }));
+    }
+
+    // ── 8-direction joystick ──
+    var jsBall    = document.getElementById("joystick-ball");
+    var jsBase    = document.getElementById("joystick-base");
+    var jsActive  = false;
+    var jsKeys    = { up: false, down: false, left: false, right: false };
+    var jsMaxDist = 32, jsDeadZone = 10;
+
+    function jsGetCenter() {
+        var r = jsBase.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    function jsUpdateDir(dx, dy) {
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        var n = { up: false, down: false, left: false, right: false };
+        if (dist > jsDeadZone) {
+            var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            if      (angle > -112.5 && angle <  -67.5) { n.up = true; }
+            else if (angle >   67.5 && angle <  112.5) { n.down = true; }
+            else if (angle >  157.5 || angle < -157.5) { n.left = true; }
+            else if (angle >  -22.5 && angle <   22.5) { n.right = true; }
+            else if (angle > -157.5 && angle < -112.5) { n.up = true;   n.left = true; }
+            else if (angle >  -67.5 && angle <  -22.5) { n.up = true;   n.right = true; }
+            else if (angle >   22.5 && angle <   67.5) { n.down = true; n.right = true; }
+            else if (angle >  112.5 && angle <  157.5) { n.down = true; n.left = true; }
+        }
+        if (n.up    !== jsKeys.up)    sendKey(n.up    ? "keydown" : "keyup", "ArrowUp");
+        if (n.down  !== jsKeys.down)  sendKey(n.down  ? "keydown" : "keyup", "ArrowDown");
+        if (n.left  !== jsKeys.left)  sendKey(n.left  ? "keydown" : "keyup", "ArrowLeft");
+        if (n.right !== jsKeys.right) sendKey(n.right ? "keydown" : "keyup", "ArrowRight");
+        jsKeys = n;
+    }
+    function jsMove(cx, cy) {
+        var c = jsGetCenter(), dx = cx - c.x, dy = cy - c.y;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > jsMaxDist) { dx = dx/dist*jsMaxDist; dy = dy/dist*jsMaxDist; }
+        jsBall.style.transform = "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px))";
+        jsUpdateDir(dx, dy);
+    }
+    function jsReset() { jsActive = false; jsBall.style.transform = "translate(-50%,-50%)"; jsUpdateDir(0,0); }
+
+    jsBase.addEventListener("touchstart", function(e){ e.preventDefault(); jsActive=true; jsMove(e.touches[0].clientX,e.touches[0].clientY); }, { passive:false });
+    jsBase.addEventListener("mousedown",  function(e){ e.preventDefault(); jsActive=true; jsMove(e.clientX,e.clientY); }, { passive:false });
+    document.addEventListener("touchmove",   function(e){ if(jsActive){ e.preventDefault(); jsMove(e.touches[0].clientX,e.touches[0].clientY); } }, { passive:false });
+    document.addEventListener("mousemove",   function(e){ if(jsActive) jsMove(e.clientX,e.clientY); });
+    document.addEventListener("touchend",    function(){ if(jsActive) jsReset(); });
+    document.addEventListener("touchcancel", function(){ if(jsActive) jsReset(); });
+    document.addEventListener("mouseup",     function(){ if(jsActive) jsReset(); });
+
+    document.querySelectorAll("[data-key]").forEach(function(btn) {
+        var key = btn.dataset.key;
+        ["touchstart","mousedown"].forEach(function(evt){
+            btn.addEventListener(evt, function(e){ e.preventDefault(); btn.classList.add("active"); sendKey("keydown",key); }, { passive:false });
+        });
+        ["touchend","mouseup","touchcancel","mouseleave"].forEach(function(evt){
+            btn.addEventListener(evt, function(){ btn.classList.remove("active"); sendKey("keyup",key); });
+        });
+    });
+
+    document.addEventListener("dblclick", function(e){ e.preventDefault(); });
+</script>
+
+<!-- Standalone MAME WASM — no RetroArch, no iframe -->
+<script src="emu_core3.js"></script>
+
+</body>
+</html>
