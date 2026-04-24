@@ -140,8 +140,8 @@
 
         /* Neo Geo 4-button layout: A B C D */
         #buttons-area {
-            position: absolute; right: 12px; bottom: 16px;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            position: absolute; right: 16px; bottom: 20px;
+            display: flex; gap: 12px; align-items: center;
             pointer-events: auto;
         }
         .action-btn {
@@ -238,7 +238,6 @@
             <div class="action-btn" id="btn-a" data-key="KeyA">A</div>
             <div class="action-btn" id="btn-b" data-key="KeyS">B</div>
             <div class="action-btn" id="btn-c" data-key="KeyD">C</div>
-            <div class="action-btn" id="btn-d" data-key="KeyW">D</div>
         </div>
         <div class="screw" id="screw-tl"></div>
         <div class="screw" id="screw-tr"></div>
